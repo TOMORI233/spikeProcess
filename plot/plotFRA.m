@@ -44,7 +44,8 @@ function varargout = plotFRA(trialAll, window)
                 spikes = cat(1, spikes{:});
                 spikes1 = spikes(spikes >= windowBase(1) & spikes <= windowBase(2));
                 spikes2 = spikes(spikes >= windowOnset(1) & spikes <= windowOnset(2));
-                fr(aIndex, fIndex) = (numel(spikes2) - numel(spikes1)) / (window(2) - window(1)) * 1000 / nTrial; % Hz
+                % fr(aIndex, fIndex) = (numel(spikes2) - numel(spikes1)) / (window(2) - window(1)) * 1000 / nTrial; % Hz
+                fr(aIndex, fIndex) = numel(spikes2) / (window(2) - window(1)) * 1000 / nTrial; % Hz
             end
         end
     end
