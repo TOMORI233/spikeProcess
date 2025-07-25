@@ -1,8 +1,15 @@
-function varargout = plotFRA(trialAll, window)
-    narginchk(1, 2);
+function varargout = plotFRA(trialAll, window, clus)
+    % trialAll(i).spike should be a vector
+    % Unit: ms
+
+    narginchk(1, 3);
 
     if nargin < 2
         window = [0, 300]; % ms
+    end
+
+    if nargin < 3
+        clus = [];
     end
 
     Fig = figure("WindowState", "maximized");
@@ -19,7 +26,14 @@ function varargout = plotFRA(trialAll, window)
             idx = [trialAll.freq] == freq(fIndex) & [trialAll.att] == att(aIndex);
             if any(idx)
                 spikes = {trialAll(idx).spike}';
-                nTrial = length(spikes);
+
+                if ~isempty(clus)
+                    spikes = cellfun(@(x) x(x(:, 2) == clus, 1), spikes, "UniformOutput", false);
+                else
+                    spikes = cellfun(@(x) x(:, 1), spikes, "UniformOutput", false);
+                end
+
+                nTrial = numel(spikes);
                 ax = mSubplot(Fig, length(att), length(freq), (aIndex - 1) * length(freq) + fIndex, "shape", "fill", "padding_bottom", 0.5, "padding_right", 0.05);
                 rasterData.X = spikes;
                 rasterData.color = "r";
@@ -42,10 +56,8 @@ function varargout = plotFRA(trialAll, window)
                 end
                 
                 spikes = cat(1, spikes{:});
-                spikes1 = spikes(spikes >= windowBase(1) & spikes <= windowBase(2));
-                spikes2 = spikes(spikes >= windowOnset(1) & spikes <= windowOnset(2));
-                % fr(aIndex, fIndex) = (numel(spikes2) - numel(spikes1)) / (window(2) - window(1)) * 1000 / nTrial; % Hz
-                fr(aIndex, fIndex) = numel(spikes2) / (window(2) - window(1)) * 1000 / nTrial; % Hz
+                spikes = spikes(spikes >= windowOnset(1) & spikes <= windowOnset(2));
+                fr(aIndex, fIndex) = numel(spikes) / (window(2) - window(1)) * 1000 / nTrial; % Hz
             end
         end
     end
@@ -54,7 +66,7 @@ function varargout = plotFRA(trialAll, window)
     imagesc(ax, fr);
     set(ax, "XLimitMethod", "tight");
     set(ax, "YLimitMethod", "tight");
-    colormap(ax, "jet");
+    colormap(ax, slanCM('YlOrRd'));
     mColorbar(ax, "Location", "eastoutside");
     ax.TickLength = [0, 0];
     set(ax, "XTickLabels", '');
