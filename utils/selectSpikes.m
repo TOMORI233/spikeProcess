@@ -1,82 +1,108 @@
 function out = selectSpikes(sortdata, trialAllOrtEvt, window)
-% Efficient & vectorized spike extraction within relative window for each event time
+% Efficient spike extraction around events with automatic overlap detection.
+%
+% - Uses fast histcounts method if no window overlap
+% - Switches to binary search (discretize) if overlap detected
+%
 % INPUT:
-%   sortdata:       [N x 2] array [spikeTime, cluster] or [N x 1] vector of spike times
-%   trialAllOrtEvt: [trialAll] (with field 'onset' representing [tEvt]) 
-%                   or [tEvt] ([M x 1] or [1 x M] vector of event times)
-%   window:         [1 x 2] window relative to [tEvt]
+%   sortdata:       [N×2] (spikeTime, cluster) or [N×1] spikeTime only
+%   trialAllOrtEvt: struct with .onset field, or [tEvt] vector
+%   window:         [start, end], relative to event
+%
 % OUTPUT:
-%   out: If the second input is [trialAll], returns trialAll with extra field 'spike'.
-%        If the second input is [tEvt], returns {M x 1} cell array of [spikeTime - t(i), cluster] 
-%        when [sortdata] is [N x 2] array, or returns {M x 1} cell array of [spikeTime - t(i)] 
-%        when [sortdata] is [N x 1] vector.
-% NOTE:
-%   Make sure all inputs are in the same unit (e.g., ms).
+%   If input is struct: returns with added .spike field
+%   Else: returns cell array of spike data per event
 
-% Check if spikeTimes are ascending
-if any(diff(sortdata(:, 1)) < 0)
-    error('selectSpike:sortdataNotAscend', ...
-          'The first column of sortdata (spike times) must be in ascending order.');
-end
-
-% Vectorized spike selection aligned to tEvt
-spikeTimes = sortdata(:, 1);
-hasClusterInfo = size(spikeTimes, 2) > 1;
-if hasClusterInfo
+% Sort spikeTimes
+hasCluster = size(sortdata, 2) > 1;
+if hasCluster
+    sortdata = sortrows(sortdata, 1, "ascend");
+    spikeTimes = sortdata(:, 1);
     clusters = sortdata(:, 2);
+else
+    spikeTimes = sort(sortdata, "ascend");
 end
 
+% Parse input events
 switch class(trialAllOrtEvt)
     case 'struct'
-        % as trialAll
-        if isfield(trialAllOrtEvt, "onset")
-            tEvt = [trialAllOrtEvt.onset]';
-        else
-            error("Input [trialAll] should contain field 'onset'.");
+        if ~isfield(trialAllOrtEvt, "onset")
+            error("Struct must contain 'onset' field.");
         end
-    case {'single', 'double'}
-        % as event times
-        tEvt = trialAllOrtEvt(:);
+        tEvt = double([trialAllOrtEvt.onset]');
+        isStruct = true;
+    case {'double', 'single'}
+        tEvt = double(trialAllOrtEvt(:));
+        isStruct = false;
     otherwise
-        error("Invalid input");
-end
-numelEvt = numel(tEvt);
-
-% Compute start/end of windows
-winStart = tEvt + window(1);
-winEnd   = tEvt + window(2);
-
-% Use histcounts to find which window each spike belongs to
-edges = sort([winStart; winEnd]); % 2*M edges
-[~, ~, binIdx] = histcounts(spikeTimes, [-Inf; edges; Inf]);
-
-% Only keep spikes that fall **inside some window** (binIdx even)
-isInWindow = mod(binIdx,2)==0 & binIdx>0 & binIdx<=2*numelEvt;
-binIdx = binIdx(isInWindow);
-spikeTimesIn = spikeTimes(isInWindow);
-if hasClusterInfo
-    clustersIn = clusters(isInWindow);
+        error("Invalid input type.");
 end
 
-% Map binIdx to t index
-trialIdx = binIdx/2;  % now always <= M
+numEvt = numel(tEvt);
 
-% Align spike times
-alignedSpikes = spikeTimesIn - tEvt(trialIdx);
+% Detect overlap
+isOverlap = any(diff(tEvt) < diff(window));
 
-% Group by trial
-if hasClusterInfo
-    spikesOut = accumarray(trialIdx, (1:numel(alignedSpikes))', [numelEvt, 1], ...
-                           @(ix) {[alignedSpikes(ix), clustersIn(ix)]}, {zeros(0, 2)});
+% -- Case 1: No overlap, use fast histcounts --
+if ~isOverlap
+    winStart = tEvt + window(1);
+    winEnd   = tEvt + window(2);
+
+    edges = sort([winStart; winEnd]);
+    [~, ~, binIdx] = histcounts(spikeTimes, [-Inf; edges; Inf]);
+
+    % spikes in even-numbered bins are inside windows
+    isInWin = mod(binIdx, 2) == 0 & binIdx > 0 & binIdx <= 2 * numEvt;
+    binIdx = binIdx(isInWin);
+    spikeTimes = spikeTimes(isInWin);
+    if hasCluster
+        clusters = clusters(isInWin);
+    end
+
+    trialIdx = binIdx / 2;
+    spikeTimes = spikeTimes - tEvt(trialIdx);
+
+    if hasCluster
+        outCell = accumarray(trialIdx, (1:numel(spikeTimes))', [numEvt, 1], ...
+            @(ix) {sortrows([spikeTimes(ix), clusters(ix)], 2)}, {zeros(0, 2)});
+    else
+        outCell = accumarray(trialIdx, (1:numel(spikeTimes))', [numEvt, 1], ...
+            @(ix) {spikeTimes(ix)}, {zeros(0, 1)});
+    end
+
+    % -- Case 2: Overlap exists, use binary search + repeat allowed --
 else
-    spikesOut = accumarray(trialIdx, (1:numel(alignedSpikes))', [numelEvt, 1], ...
-                           @(ix) {alignedSpikes(ix)}, {zeros(0, 1)});
+    outCell = cell(numEvt, 1);
+    % binary search window bounds
+    spkIdxStart = discretize(tEvt + window(1), [-Inf; spikeTimes; Inf]);
+    spkIdxEnd   = discretize(tEvt + window(2), [-Inf; spikeTimes; Inf]);
+
+    for i = 1:numEvt
+        idx1 = spkIdxStart(i);
+        idx2 = spkIdxEnd(i) - 1;
+        if idx2 >= idx1 && idx1 > 0
+            spkIdx = idx1:idx2;
+            relTime = spikeTimes(spkIdx) - tEvt(i);
+            if hasCluster
+                outCell{i} = [relTime, clusters(spkIdx)];
+            else
+                outCell{i} = relTime;
+            end
+        else
+            if hasCluster
+                outCell{i} = zeros(0, 2);
+            else
+                outCell{i} = zeros(0, 1);
+            end
+        end
+    end
 end
 
-if isstruct(trialAllOrtEvt)
-    out = mu.addfield(trialAllOrtEvt, "spike", spikesOut);
+% Output
+if isStruct
+    out = mu.addfield(trialAllOrtEvt, "spike", outCell);
 else
-    out = spikesOut;
+    out = outCell;
 end
 
 return;
