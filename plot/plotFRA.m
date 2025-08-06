@@ -34,15 +34,16 @@ function varargout = plotFRA(trialAll, window, clus)
                 end
 
                 nTrial = numel(spikes);
-                ax = mSubplot(Fig, length(att), length(freq), (aIndex - 1) * length(freq) + fIndex, "shape", "fill", "padding_bottom", 0.5, "padding_right", 0.05);
+                ax = mu.subplot(Fig, length(att), length(freq), (aIndex - 1) * length(freq) + fIndex, "shape", "fill", "padding_bottom", 0.5, "padding_right", 0.05);
                 rasterData.X = spikes;
                 rasterData.color = "r";
-                mRaster(ax, rasterData, 10);
+                mu.rasterplot(ax, rasterData, 10);
                 set(ax, "Box", "on");
                 if aIndex ~= length(att) || fIndex ~= 1
                     set(ax, "XTickLabels", '');
                 else
                     xticks(ax, window);
+                    ax.XTickLabelRotation = 0;
                 end
                 set(ax, "YTickLabels", '');
                 xlim(window);
@@ -62,12 +63,12 @@ function varargout = plotFRA(trialAll, window, clus)
         end
     end
 
-    ax = mSubplot(Fig, 1, 1, 1, "shape", "fill", "padding_top", 0.52, "padding_right", 0.05);
+    ax = mu.subplot(Fig, 1, 1, 1, "shape", "fill", "padding_top", 0.52, "padding_right", 0.05);
     imagesc(ax, fr);
     set(ax, "XLimitMethod", "tight");
     set(ax, "YLimitMethod", "tight");
     colormap(ax, slanCM('YlOrRd'));
-    mColorbar(ax, "Location", "eastoutside");
+    mu.colorbar(ax, "Location", "eastoutside");
     ax.TickLength = [0, 0];
     set(ax, "XTickLabels", '');
     yticks(ax, 1:length(att));

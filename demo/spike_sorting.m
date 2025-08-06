@@ -16,10 +16,11 @@ for pIndex = 1:length(NoisePATH)
     [trialAllNoise, ITI] = noiseProcessFcn(dataNoise.epocs);
     sortResNoise = mysort(dataNoise, ch, "reselect", "preview");
     window = [-100, ITI];
-    trialAllNoise = selectSpikes(sortResNoise.spikeTimeAll(sortResNoise.clusterIdx == 1) * 1000, ...
-                                 trialAllNoise, window);
+    idx = sortResNoise.clusterIdx == 1;
+    sortdata = sortResNoise.spikeTimeAll(idx) * 1e3;
+    trialAllNoise = mu.addfield(trialAllNoise, "spike", selectSpikes(sortdata, [trialAllNoise.onset], window));
     plotNoiseResponse(trialAllNoise);
-    addTitle2Fig(['Neuron No. ', num2str(pIndex)]);
+    mu.addTitle(['Neuron No. ', num2str(pIndex)]);
 
     % FRA
     dataFRA = TDTbin2mat(FraPATH{pIndex});
@@ -28,8 +29,8 @@ for pIndex = 1:length(NoisePATH)
     sortResFRA = templateMatching(dataFRA, sortResNoise, ch);
     trialAllFRA = selectSpikes(sortResFRA.spikeTimeAll(sortResFRA.clusterIdx == 1) * 1000, ...
                                trialAllFRA, window);
-    plotFRA(trialAllFRA);
-    addTitle2Fig(['Neuron No. ', num2str(pIndex)]);
+    plotFRA(trialAllFRA, [0, 150]);
+    mu.addTitle(['Neuron No. ', num2str(pIndex)]);
 
     % TCI
     data1 = TDTbin2mat(PATH1{pIndex}); % seg-31
