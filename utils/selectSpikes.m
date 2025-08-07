@@ -41,7 +41,7 @@ end
 numEvt = numel(tEvt);
 
 % Detect overlap
-isOverlap = any(diff(tEvt) < diff(window));
+isOverlap = any(tEvt(2:end) + window(1) < tEvt(1:end - 1) | tEvt(1:end - 1) + window(2) > tEvt(2:end));
 
 % -- Case 1: No overlap, use fast histcounts --
 if ~isOverlap
@@ -70,8 +70,8 @@ if ~isOverlap
             @(ix) {spikeTimes(ix)}, {zeros(0, 1)});
     end
 
-    % -- Case 2: Overlap exists, use binary search + repeat allowed --
 else
+    % -- Case 2: Overlap exists, use binary search + repeat allowed --
     outCell = cell(numEvt, 1);
     % binary search window bounds
     spkIdxStart = discretize(tEvt + window(1), [-Inf; spikeTimes; Inf]);
