@@ -28,6 +28,8 @@ for pIndex = 1:length(NoisePATH)
     window = [-100, ITI];
     sortResFRA = templateMatching(dataFRA, sortResNoise, ch);
     trialAllFRA = mu_selectSpikes(sortResFRA.spikeTimeAll(sortResFRA.clusterIdx == 1) * 1000, ...
+                                  trialAllFRA, window);
+    trialAllFRA = mu_selectSpikes(sortResFRA.spikeTimeAll(sortResFRA.clusterIdx == 1) * 1000, ...
                                trialAllFRA, window);
     plotFRA(trialAllFRA, [0, 150]);
     mu.addTitle(['Neuron No. ', num2str(pIndex)]);
@@ -41,9 +43,9 @@ for pIndex = 1:length(NoisePATH)
     sortRes1 = templateMatching(data1, sortResNoise, ch);
     sortRes2 = templateMatching(data2, sortResNoise, ch);
     trialAll1 = mu_selectSpikes(sortRes1.spikeTimeAll(sortRes1.clusterIdx == 1) * 1000, ...
-                             trialAll1, window);
+                                trialAll1, window);
     trialAll2 = mu_selectSpikes(sortRes2.spikeTimeAll(sortRes2.clusterIdx == 1) * 1000, ...
-                             trialAll2, window);
+                                trialAll2, window);
 
     for dIndex = 1:1
         seg = 500/2^(5 - dIndex); % ms

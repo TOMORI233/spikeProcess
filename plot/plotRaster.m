@@ -28,10 +28,16 @@ ylabel(ax2, "Firing rate (Hz)");
 
 mu.scaleAxes(Fig, "x", window);
 mu.addLines(Fig, struct("X", 0));
+mu.scaleAxes(Fig, "x", window);
+mu.addLines(Fig, struct("X", 0));
 
 if nargout == 1
     varargout{1} = Fig;
 end
+if nargout == 1
+    varargout{1} = Fig;
+end
 
+return;
 return;
 end
